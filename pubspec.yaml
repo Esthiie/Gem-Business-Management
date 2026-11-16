@@ -1,0 +1,26 @@
+name: gem_business_management
+description: Gem Business Management - owner app for Queens.Trinket (TMA3084 Group 9 Comet).
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  provider: ^6.1.2
+  google_fonts: ^6.2.1
+  cupertino_icons: ^1.0.8
+  # Step 2 (backend) will add:
+  # firebase_core, firebase_auth, cloud_firestore, firebase_storage, image_picker
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
