@@ -625,7 +625,7 @@ class SwitchRow extends StatelessWidget {
       Switch.adaptive(
         value: value,
         onChanged: onChanged,
-        activeColor: AppColors.purple,
+        activeThumbColor: AppColors.purple,
       ),
     ]);
   }
@@ -671,4 +671,29 @@ void showToast(BuildContext context, String text) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(text)));
+}
+
+/// Purple "View sales ›" style link.
+class LinkText extends StatelessWidget {
+  const LinkText(this.text, {super.key, required this.onTap});
+  final String text;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Text(text,
+              style: AppText.body(14,
+                  color: AppColors.purple, weight: FontWeight.w700)),
+          const Icon(Icons.chevron_right_rounded,
+              size: 18, color: AppColors.purple),
+        ]),
+      ),
+    );
+  }
 }

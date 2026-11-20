@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
+import '../routes.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bead_ring.dart';
 import '../widgets/common.dart';
+import '../widgets/event_picker.dart';
 
-/// Booth sale (offline-friendly POS).
+/// Booth sale (UI-05): tap what the customer takes, then Record sale and
+/// choose how they paid (UI-06). Works offline; saved sales sync later.
 class SellScreen extends StatefulWidget {
   const SellScreen({super.key});
 
@@ -17,12 +20,13 @@ class SellScreen extends StatefulWidget {
 
 class _SellScreenState extends State<SellScreen> {
   final Map<String, int> _cart = {};
-  int _mode = 0; // 0 Collection, 1 Enter total only
   String _cat = 'All';
   late String _eventId;
-  final _total = TextEditingController();
-  final _note = TextEditingController();
-  bool _saved = false;
+  String? _savedLabel;
+  final _scroll = ScrollController();
+  final Map<String, GlobalKey> _sectionKeys = {
+    for (final c in Categories.all) c: GlobalKey(),
+  };
 
   @override
   void initState() {
@@ -32,64 +36,53 @@ class _SellScreenState extends State<SellScreen> {
 
   @override
   void dispose() {
-    _total.dispose();
-    _note.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
-  Future<void> _pickEvent(AppState s) async {
-    final picked = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: AppColors.white,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const SizedBox(height: 12),
-          Text('Which event?', style: AppText.heading(18)),
-          const SizedBox(height: 8),
-          for (final e in s.events)
-            ListTile(
-              title: Text(e.name, style: AppText.body(15, weight: FontWeight.w600)),
-              subtitle: Text(longDate(e.date), style: AppText.body(13, color: AppColors.muted)),
-              trailing: e.id == _eventId ? const Icon(Icons.check_rounded) : null,
-              onTap: () => Navigator.pop(ctx, e.id),
-            ),
-          const SizedBox(height: 8),
-        ]),
-      ),
-    );
-    if (picked != null) setState(() => _eventId = picked);
+  /// Category chips jump to that section of the list.
+  void _jumpTo(String cat) {
+    setState(() => _cat = cat);
+    if (cat == 'All') {
+      _scroll.animateTo(0,
+          duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+      return;
+    }
+    final ctx = _sectionKeys[cat]?.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(ctx,
+          duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+    }
   }
 
-  void _record(AppState s) {
-    if (_mode == 0) {
-      if (_cart.isEmpty) {
-        showToast(context, 'Tap the items you sold first.');
-        return;
-      }
-      s.recordSale(_eventId, Map.of(_cart));
-      setState(() {
-        _cart.clear();
-        _saved = true;
+  void _setQty(String id, int n) => setState(() {
+        _savedLabel = null;
+        if (n <= 0) {
+          _cart.remove(id);
+        } else {
+          _cart[id] = n;
+        }
       });
-    } else {
-      final v = double.tryParse(_total.text);
-      if (v == null || v <= 0) {
-        showToast(context, 'Key in the total collected.');
-        return;
-      }
-      s.recordTotalOnly(_eventId, v, _note.text.trim());
-      _total.clear();
-      _note.clear();
-      setState(() => _saved = true);
+
+  Future<void> _record(AppState s, double total, int count) async {
+    if (_cart.isEmpty) {
+      showToast(context, 'Tap the items the customer is taking first.');
+      return;
     }
+    final method = await showPaymentSheet(context, total: total, count: count);
+    if (method == null || !mounted) return;
+    final sale = s.recordSale(_eventId, Map.of(_cart), method);
+    if (sale == null) return;
+    setState(() {
+      _cart.clear();
+      _savedLabel =
+          '${sale.customer} · ${rm(sale.total)} · ${method.short} · saved';
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final s = context.watch<AppState>();
-    final event = s.events.firstWhere((e) => e.id == _eventId);
     double total = 0;
     int count = 0;
     _cart.forEach((id, q) {
@@ -100,37 +93,60 @@ class _SellScreenState extends State<SellScreen> {
     return Scaffold(
       body: SafeArea(
         child: Column(children: [
-          const AppHeader(title: 'Booth sale', backLabel: 'Home'),
+          AppHeader(
+            title: 'Booth sale',
+            backLabel: 'Home',
+            titleTrailing: LinkText('View sales',
+                onTap: () => Navigator.pushNamed(context, Routes.sales)),
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(children: [
-              CardBox(
-                radius: 14,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                onTap: () => _pickEvent(s),
-                child: Row(children: [
-                  const Icon(Icons.place_outlined, size: 18),
-                  const SizedBox(width: 8),
-                  Text('Event ', style: AppText.body(14, color: AppColors.muted)),
-                  Expanded(
-                      child: Text(event.name,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppText.body(14, weight: FontWeight.w700))),
-                  const Icon(Icons.expand_more_rounded, color: AppColors.muted),
-                ]),
-              ),
-              const SizedBox(height: 12),
-              Segmented(
-                options: const ['Collection', 'Enter total only'],
-                index: _mode,
-                onChanged: (i) => setState(() {
-                  _mode = i;
-                  _saved = false;
-                }),
-              ),
-            ]),
+            child: EventPicker(
+              label: 'Event',
+              icon: Icons.place_outlined,
+              options: [
+                for (final e in s.events)
+                  EventOption(e.id, e.name,
+                      e.id == s.liveEvent.id ? '${e.dates} · today' : e.dates),
+              ],
+              selected: _eventId,
+              onSelected: (id) => setState(() => _eventId = id ?? _eventId),
+            ),
           ),
-          Expanded(child: _mode == 0 ? _collection(s) : _totalOnly()),
+          ChoiceChips(
+            options: ['All', ...Categories.all],
+            selected: (c) => c == _cat,
+            onSelected: _jumpTo,
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              controller: _scroll,
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final c in Categories.all) ...[
+                      Padding(
+                        key: _sectionKeys[c],
+                        padding: const EdgeInsets.only(top: 8, bottom: 8),
+                        child: SectionLabel(c),
+                      ),
+                      GridView.count(
+                        crossAxisCount: 2,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        mainAxisSpacing: 10,
+                        crossAxisSpacing: 10,
+                        childAspectRatio: 1.45,
+                        children: [
+                          for (final d in s.designsIn(c)) _tile(d),
+                        ],
+                      ),
+                    ],
+                  ]),
+            ),
+          ),
           // Summary bar
           Container(
             margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -148,37 +164,30 @@ class _SellScreenState extends State<SellScreen> {
             ),
             child: Row(children: [
               Expanded(
-                child: _saved
+                child: _savedLabel != null
                     ? Row(children: [
                         const Icon(Icons.check_rounded,
                             color: AppColors.purple, size: 20),
                         const SizedBox(width: 8),
                         Flexible(
-                          child: Text(
-                              s.online
-                                  ? 'Sale saved · stock updated'
-                                  : 'Saved on this phone · syncs later',
+                          child: Text(_savedLabel!,
                               style: AppText.body(14,
                                   color: AppColors.purple,
                                   weight: FontWeight.w700)),
                         ),
                       ])
-                    : _mode == 0
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                                Text('$count ${count == 1 ? 'item' : 'items'}',
-                                    style: AppText.body(12,
-                                        color: AppColors.muted)),
-                                Text(rm(total), style: AppText.heading(22)),
-                              ])
-                        : Text('Saved on this phone, syncs when online',
-                            style:
-                                AppText.body(13, color: AppColors.muted)),
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                            Text('$count ${count == 1 ? 'item' : 'items'}',
+                                style:
+                                    AppText.body(12, color: AppColors.muted)),
+                            Text(rm(total), style: AppText.heading(22)),
+                          ]),
               ),
               PrimaryButton('Record sale',
-                  height: 50, onPressed: () => _record(s)),
+                  height: 50, onPressed: () => _record(s, total, count)),
             ]),
           ),
         ]),
@@ -186,54 +195,10 @@ class _SellScreenState extends State<SellScreen> {
     );
   }
 
-  Widget _collection(AppState s) {
-    final cats = _cat == 'All' ? Categories.all : [_cat];
-    return Column(children: [
-      ChoiceChips(
-        options: ['All', ...Categories.all],
-        selected: (c) => c == _cat,
-        onSelected: (c) => setState(() => _cat = c),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-      ),
-      Expanded(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-          children: [
-            for (final c in cats) ...[
-              Padding(
-                padding: const EdgeInsets.only(top: 8, bottom: 8),
-                child: SectionLabel(c),
-              ),
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                childAspectRatio: 1.45,
-                children: [
-                  for (final d in s.designsIn(c)) _tile(d),
-                ],
-              ),
-            ],
-          ],
-        ),
-      ),
-    ]);
-  }
-
   Widget _tile(Design d) {
     final q = _cart[d.id] ?? 0;
     final out = d.qty == 0;
     final left = d.qty - q;
-    void setQty(int n) => setState(() {
-          _saved = false;
-          if (n <= 0) {
-            _cart.remove(d.id);
-          } else {
-            _cart[d.id] = n;
-          }
-        });
 
     return Opacity(
       opacity: out ? 0.45 : 1,
@@ -248,7 +213,7 @@ class _SellScreenState extends State<SellScreen> {
             ),
             child: InkWell(
               borderRadius: BorderRadius.circular(16),
-              onTap: out || q >= d.qty ? null : () => setQty(q + 1),
+              onTap: out || q >= d.qty ? null : () => _setQty(d.id, q + 1),
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Column(
@@ -284,7 +249,7 @@ class _SellScreenState extends State<SellScreen> {
                   icon: Icons.remove_rounded,
                   size: 30,
                   tooltip: 'Remove one',
-                  onTap: () => setQty(q - 1)),
+                  onTap: () => _setQty(d.id, q - 1)),
               const SizedBox(width: 6),
               Container(
                 constraints: const BoxConstraints(minWidth: 30),
@@ -303,28 +268,81 @@ class _SellScreenState extends State<SellScreen> {
       ]),
     );
   }
+}
 
-  Widget _totalOnly() {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-      children: [
-        Text('For a busy rush: key in the takings now, match items to stock later.',
-            style: AppText.body(14, color: AppColors.muted)),
-        const SizedBox(height: 14),
-        FieldLabel('Total collected (RM)',
-            child: TextField(
-              controller: _total,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              style: AppText.heading(30),
-              decoration: const InputDecoration(hintText: '0.00'),
-            )),
-        const SizedBox(height: 14),
-        LabeledField(
-            label: 'Note (optional)',
-            controller: _note,
-            hint: 'e.g. 3 charms, 2 bracelets'),
-      ],
+/// "How did they pay?" sheet (UI-06). Returns the method, or null when
+/// Faith goes back to the items.
+Future<PayMethod?> showPaymentSheet(BuildContext context,
+    {required double total, required int count}) {
+  Widget payButton(BuildContext ctx, PayMethod m) {
+    final cash = m == PayMethod.cash;
+    final fg = cash ? AppColors.greenText : AppColors.purple;
+    return SizedBox(
+      height: 60,
+      child: FilledButton.icon(
+        style: FilledButton.styleFrom(
+          backgroundColor: cash ? AppColors.greenSoft : AppColors.purpleSoft,
+          foregroundColor: fg,
+          side: const BorderSide(color: AppColors.line),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          textStyle: AppText.body(17, weight: FontWeight.w700),
+        ),
+        icon: Icon(cash ? Icons.payments_outlined : Icons.qr_code_2_rounded,
+            size: 22),
+        label: Text(m.long),
+        onPressed: () => Navigator.pop(ctx, m),
+      ),
     );
   }
+
+  return showModalBottomSheet<PayMethod>(
+    context: context,
+    backgroundColor: AppColors.white,
+    barrierColor: const Color(0x73121212),
+    shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 5,
+                decoration: BoxDecoration(
+                    color: const Color(0xFFD6D6DC),
+                    borderRadius: BorderRadius.circular(3)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text('$count ${count == 1 ? 'item' : 'items'}',
+                textAlign: TextAlign.center,
+                style: AppText.body(14, color: AppColors.muted)),
+            Text(rm(total),
+                textAlign: TextAlign.center, style: AppText.heading(40)),
+            const SizedBox(height: 8),
+            Text('How did they pay?',
+                textAlign: TextAlign.center,
+                style: AppText.body(14,
+                    color: AppColors.muted, weight: FontWeight.w600)),
+            const SizedBox(height: 12),
+            payButton(ctx, PayMethod.cash),
+            const SizedBox(height: 12),
+            payButton(ctx, PayMethod.qr),
+            const SizedBox(height: 6),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Back to items',
+                  style: AppText.body(14,
+                      color: AppColors.muted, weight: FontWeight.w600)),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }

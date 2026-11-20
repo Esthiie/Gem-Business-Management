@@ -4,12 +4,13 @@ import 'package:provider/provider.dart';
 import 'routes.dart';
 import 'screens/add_design_screen.dart';
 import 'screens/add_event_screen.dart';
-import 'screens/add_material_screen.dart';
 import 'screens/best_sellers_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_shell.dart';
 import 'screens/new_order_screen.dart';
 import 'screens/order_detail_screen.dart';
+import 'screens/sale_detail_screen.dart';
+import 'screens/sales_screen.dart';
 import 'screens/sell_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/setup/setup_account_screen.dart';
@@ -51,7 +52,7 @@ class GemApp extends StatelessWidget {
         Routes.home: (_) => const MainShell(),
         Routes.sell: (_) => const SellScreen(),
         Routes.addDesign: (_) => const AddDesignScreen(),
-        Routes.addMaterial: (_) => const AddMaterialScreen(),
+        Routes.sales: (_) => const SalesScreen(),
         Routes.bestSellers: (_) => const BestSellersScreen(),
         Routes.newOrder: (_) => const NewOrderScreen(),
         Routes.addEvent: (_) => const AddEventScreen(),
@@ -63,6 +64,13 @@ class GemApp extends StatelessWidget {
           return MaterialPageRoute(
             settings: settings,
             builder: (_) => OrderDetailScreen(orderId: id),
+          );
+        }
+        if (settings.name == Routes.saleDetail) {
+          final id = settings.arguments as String;
+          return MaterialPageRoute(
+            settings: settings,
+            builder: (_) => SaleDetailScreen(saleId: id),
           );
         }
         return null;

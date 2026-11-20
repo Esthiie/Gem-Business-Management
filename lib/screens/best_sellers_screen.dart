@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
+import '../routes.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bead_ring.dart';
@@ -43,10 +44,12 @@ class _BestSellersScreenState extends State<BestSellersScreen> {
         child: ListView(
           padding: const EdgeInsets.only(bottom: 24),
           children: [
-            const AppHeader(
+            AppHeader(
                 title: 'Best sellers',
                 subtitle: 'Ranked by units sold',
-                backLabel: 'Home'),
+                backLabel: 'Home',
+                titleTrailing: LinkText('View sales',
+                    onTap: () => Navigator.pushNamed(context, Routes.sales))),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
@@ -100,9 +103,9 @@ class _BestSellersScreenState extends State<BestSellersScreen> {
                         ),
                         child: Column(children: [
                           _option(null, 'All events',
-                              '${s.events.length} events so far'),
-                          for (final e in s.events)
-                            _option(e.id, e.name, longDate(e.date)),
+                              '${s.rankedEvents.length} events so far'),
+                          for (final e in s.rankedEvents)
+                            _option(e.id, e.name, '${e.dates} ${e.date.year}'),
                         ]),
                       ),
                     ],

@@ -67,7 +67,7 @@ class _ColourChooserState extends State<ColourChooser> {
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
-        Text('Colours', style: AppText.body(12, color: AppColors.muted, weight: FontWeight.w600)),
+        Text('Usual colours', style: AppText.body(12, color: AppColors.muted, weight: FontWeight.w600)),
         const Spacer(),
         Text(
             '${widget.colours.length} ${widget.colours.length == 1 ? 'colour' : 'colours'}',
@@ -113,7 +113,7 @@ class _ColourChooserState extends State<ColourChooser> {
               color: AppColors.lavenderTint,
               borderRadius: BorderRadius.circular(999),
             ),
-            child: Text(_open ? 'Close picker' : 'More colours',
+            child: Text(_open ? 'Hide mosaic' : 'Colour mosaic',
                 style: AppText.body(12, weight: FontWeight.w700)),
           ),
         ),

@@ -8,7 +8,7 @@ import '../theme/app_theme.dart';
 import '../widgets/bead_ring.dart';
 import '../widgets/common.dart';
 
-/// UI-03 Home.
+/// UI-04 Home.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -16,7 +16,9 @@ class HomeScreen extends StatelessWidget {
     Categories.phoneCharms: Color(0xFFE0577A),
     Categories.bracelets: Color(0xFF2F7FB5),
     Categories.necklaces: Color(0xFF4B3F72),
+    Categories.lanyards: Color(0xFFC8743A),
     Categories.hairClips: Color(0xFFD8C9B0),
+    Categories.earrings: Color(0xFFF2B9C6),
   };
 
   @override
@@ -25,6 +27,8 @@ class HomeScreen extends StatelessWidget {
     final live = s.liveEvent;
     final low = s.lowDesigns;
     final top = s.ranking(live.id).take(3).toList();
+    final today = s.salesToday;
+    final todayTotal = today.fold(0.0, (a, x) => a + x.total);
     final dueThisWeek =
         s.activeOrders.where((o) => s.daysLeft(o) <= 7).length;
 
@@ -95,10 +99,13 @@ class HomeScreen extends StatelessWidget {
                 child: IntrinsicHeight(
                   child: Row(children: [
                     Expanded(
-                      child: _Stat(
-                        label: 'Sales today',
-                        value: rm(s.revenueFor(live.id)),
-                        note: '${s.unitsFor(live.id)} items sold',
+                      child: InkWell(
+                        onTap: () => Navigator.pushNamed(context, Routes.sales),
+                        child: _Stat(
+                          label: 'Sales today ›',
+                          value: rm(todayTotal),
+                          note: customers(today.length),
+                        ),
                       ),
                     ),
                     const VerticalDivider(width: 1, color: AppColors.line),
@@ -122,10 +129,16 @@ class HomeScreen extends StatelessWidget {
                   action: 'See all',
                   onAction: () => s.goToTab(1)),
               const SizedBox(height: 12),
-              Row(children: [
-                for (final c in Categories.all)
-                  Expanded(
-                    child: InkWell(
+              GridView.count(
+                crossAxisCount: 3,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 10,
+                childAspectRatio: 1.05,
+                children: [
+                  for (final c in Categories.all)
+                    InkWell(
                       borderRadius: BorderRadius.circular(16),
                       onTap: () => s.goToTab(1),
                       child: Column(children: [
@@ -139,8 +152,8 @@ class HomeScreen extends StatelessWidget {
                             style: AppText.body(11, color: AppColors.muted)),
                       ]),
                     ),
-                  ),
-              ]),
+                ],
+              ),
               if (low.isNotEmpty) ...[
                 const SizedBox(height: 22),
                 const _SectionHeader(title: 'Needs restocking'),

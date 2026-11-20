@@ -1,12 +1,28 @@
 import 'package:flutter/material.dart';
 
-/// The four collection categories Faith sells.
+/// The six collection categories Faith sells.
 class Categories {
   static const phoneCharms = 'Phone charms';
   static const bracelets = 'Bracelets';
   static const necklaces = 'Necklaces';
+  static const lanyards = 'Lanyards';
   static const hairClips = 'Hair clips';
-  static const all = [phoneCharms, bracelets, necklaces, hairClips];
+  static const earrings = 'Earrings';
+  static const all = [
+    phoneCharms,
+    bracelets,
+    necklaces,
+    lanyards,
+    hairClips,
+    earrings,
+  ];
+
+  /// Short label used on the Home tiles.
+  static String short(String c) => const {
+        phoneCharms: 'Phone charms',
+        hairClips: 'Hair clips',
+      }[c] ??
+      c;
 }
 
 /// A finished jewellery design in the collection (Stock > Collection).
@@ -51,41 +67,6 @@ class Design {
   }
 }
 
-const materialTypes = ['Beads', 'Strings & cords', 'Charms', 'Clips & findings'];
-const materialUnits = ['pcs', 'packs', 'rolls', 'spools', 'metres'];
-
-/// A raw material (Stock > Materials).
-class MaterialItem {
-  MaterialItem({
-    required this.id,
-    required this.type,
-    required this.name,
-    required this.usedIn,
-    required this.qty,
-    required this.unit,
-    required this.reorderBelow,
-    required this.colour,
-    this.sizeOrColour = '',
-    this.price,
-    this.whereToBuy = '',
-  });
-
-  final String id;
-  String type;
-  String name;
-  String usedIn;
-  int qty;
-  String unit;
-  int reorderBelow;
-  Color colour;
-  String sizeOrColour;
-  double? price;
-  String whereToBuy;
-
-  bool get isLow => qty < reorderBelow;
-  int get step => unit == 'pcs' ? 10 : 1;
-}
-
 /// A convention / bazaar Faith joins.
 class EventInfo {
   const EventInfo({
@@ -93,6 +74,7 @@ class EventInfo {
     required this.name,
     required this.date,
     required this.venue,
+    required this.dates,
     this.time = '',
     this.endDate,
   });
@@ -103,6 +85,15 @@ class EventInfo {
   final DateTime? endDate;
   final String venue;
   final String time;
+  final String dates; // e.g. "23–24 Oct"
+}
+
+/// How the customer paid at the booth.
+enum PayMethod { cash, qr }
+
+extension PayMethodLabel on PayMethod {
+  String get short => this == PayMethod.cash ? 'Cash' : 'QR';
+  String get long => this == PayMethod.cash ? 'Cash' : 'QR (DuitNow / TNG)';
 }
 
 /// One line of a booth sale.
@@ -114,25 +105,27 @@ class SaleLine {
   double get total => qty * unitPrice;
 }
 
-/// A recorded booth sale (tap items) or a "total only" entry.
+/// One customer at the booth: what they bought and how they paid.
 class Sale {
   Sale({
+    required this.id,
     required this.eventId,
+    required this.customerNo,
     required this.time,
     required this.lines,
-    this.totalOnly,
-    this.note = '',
+    required this.method,
   });
 
+  final String id;
   final String eventId;
+  final int customerNo; // Customer 1, 2, 3 … per event
   final DateTime time;
   final List<SaleLine> lines;
-  final double? totalOnly; // set when Faith keys in a total during a rush
-  final String note;
+  final PayMethod method;
 
-  double get total =>
-      totalOnly ?? lines.fold(0.0, (sum, l) => sum + l.total);
+  double get total => lines.fold(0.0, (sum, l) => sum + l.total);
   int get items => lines.fold(0, (sum, l) => sum + l.qty);
+  String get customer => 'Customer $customerNo';
 }
 
 /// Custom order stages: 0 New, 1 Details confirmed, 2 Making, 3 Final check, 4 Done.
@@ -175,7 +168,7 @@ class CustomOrder {
     required this.palette,
     required this.lengthCm,
     required this.price,
-    required this.deposit,
+    this.deposit = 0,
     required this.due,
     required this.stage,
     this.notes = '',
@@ -192,7 +185,7 @@ class CustomOrder {
   String palette;
   double? lengthCm;
   double price;
-  double deposit;
+  double deposit; // not shown in the app (client does not take deposits)
   DateTime due;
   int stage;
   String notes;
@@ -283,6 +276,16 @@ String _num(double v) =>
 String rm(double v) => 'RM ${_num(v)}';
 
 String rm2(double v) => 'RM ${v.toStringAsFixed(2)}';
+
+/// "4:05 pm"
+String clock(DateTime d) {
+  final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
+  final m = d.minute.toString().padLeft(2, '0');
+  return '$h:$m ${d.hour < 12 ? 'am' : 'pm'}';
+}
+
+String pcs(int n) => n == 1 ? '1 pc' : '$n pcs';
+String customers(int n) => n == 1 ? '1 customer' : '$n customers';
 
 const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const _months = [

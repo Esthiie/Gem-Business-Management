@@ -24,7 +24,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   final _palette = TextEditingController();
   final _length = TextEditingController();
   final _price = TextEditingController();
-  final _deposit = TextEditingController();
   final _notes = TextEditingController();
   List<Color> _colours = [];
   DateTime? _due;
@@ -39,7 +38,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   @override
   void dispose() {
     for (final c in [
-      _customer, _contact, _item, _palette, _length, _price, _deposit, _notes,
+      _customer, _contact, _item, _palette, _length, _price, _notes,
     ]) {
       c.dispose();
     }
@@ -67,7 +66,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           palette: _palette.text.trim(),
           lengthCm: double.tryParse(_length.text),
           price: double.tryParse(_price.text) ?? 0,
-          deposit: double.tryParse(_deposit.text) ?? 0,
           due: _due ?? s.today.add(const Duration(days: 7)),
           stage: 0,
           notes: _notes.text.trim(),
@@ -89,12 +87,9 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       ('Colours', _has(_palette) || _colours.isNotEmpty),
       ('Length', _has(_length)),
       ('Deadline', _due != null),
-      ('Picture', _pictures > 0),
     ];
     final ready = checks.where((c) => c.$2).length;
     final canCreate = _has(_customer) && _has(_item);
-    final price = double.tryParse(_price.text) ?? 0;
-    final dep = double.tryParse(_deposit.text) ?? 0;
     void refresh(String _) => setState(() {});
 
     return Scaffold(
@@ -138,7 +133,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                             child: ChoiceChips(
                                 options: const [
                                   'Phone charm', 'Bracelet', 'Necklace',
-                                  'Hair clip', 'Other',
+                                  'Lanyard', 'Hair clip', 'Earrings', 'Other',
                                 ],
                                 scroll: false,
                                 selected: (v) => v == _type,
@@ -208,7 +203,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                                   weight: FontWeight.w600)),
                         ],
                         const SizedBox(height: 12),
-                        FieldLabel('Reference pictures',
+                        FieldLabel('Reference pictures (optional)',
                             child: Row(children: [
                               for (var i = 0; i < _pictures; i++)
                                 Container(
@@ -251,33 +246,13 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                                 ),
                             ])),
                         const SizedBox(height: 20),
-                        const SectionLabel('Payment'),
-                        const SizedBox(height: 8),
-                        Row(children: [
-                          Expanded(
-                              child: LabeledField(
-                                  label: 'Price',
-                                  controller: _price,
-                                  hint: '0.00',
-                                  suffix: 'RM',
-                                  number: true,
-                                  onChanged: refresh)),
-                          const SizedBox(width: 10),
-                          Expanded(
-                              child: LabeledField(
-                                  label: 'Deposit paid',
-                                  controller: _deposit,
-                                  hint: '0.00',
-                                  suffix: 'RM',
-                                  number: true,
-                                  onChanged: refresh)),
-                        ]),
-                        if (price > 0) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                              'Balance ${rm2((price - dep).clamp(0, double.infinity).toDouble())}${dep > 0 ? ' after deposit' : ''}',
-                              style: AppText.body(13, weight: FontWeight.w600)),
-                        ],
+                        LabeledField(
+                            label: 'Price',
+                            controller: _price,
+                            hint: '0.00',
+                            suffix: 'RM',
+                            number: true,
+                            onChanged: refresh),
                         const SizedBox(height: 12),
                         LabeledField(
                             label: 'Notes (optional)',
