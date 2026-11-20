@@ -30,6 +30,9 @@ class _AddEventScreenState extends State<AddEventScreen> {
   int _daysBefore = 2;
   String? _orderId;
   int _orderLead = 1;
+  TimeOfDay _stockTime = const TimeOfDay(hour: 9, minute: 0);
+  TimeOfDay _orderTime = const TimeOfDay(hour: 9, minute: 0);
+  TimeOfDay _remTime = const TimeOfDay(hour: 9, minute: 0);
 
   @override
   void initState() {
@@ -84,6 +87,7 @@ class _AddEventScreenState extends State<AddEventScreen> {
           kind: CalendarKind.stock,
           date: _start.subtract(Duration(days: _daysBefore)),
           title: 'Stock check',
+          time: _t(_stockTime),
           sub: 'For ${_name.text.trim()}',
           isTask: true,
         ));
@@ -92,7 +96,7 @@ class _AddEventScreenState extends State<AddEventScreen> {
       // Order deadlines already come from the orders list. Adding one by
       // hand just sets a reminder for the chosen order.
       showToast(context,
-          'Reminder set ${_orderLead == 0 ? 'on the day' : '$_orderLead day${_orderLead == 1 ? '' : 's'} before'}');
+          'Reminder set ${_orderLead == 0 ? 'on the day' : '$_orderLead day${_orderLead == 1 ? '' : 's'} before'} at ${_t(_orderTime)}');
     } else {
       if (_remember.text.trim().isEmpty) {
         showToast(context, 'Write what to remember first.');
@@ -103,7 +107,7 @@ class _AddEventScreenState extends State<AddEventScreen> {
         kind: CalendarKind.stock,
         date: _start,
         title: _remember.text.trim(),
-        time: _t(_opens),
+        time: _t(_remTime),
         sub: _notes.text.trim(),
         isTask: true,
       ));
@@ -292,11 +296,15 @@ class _AddEventScreenState extends State<AddEventScreen> {
                   onTap: () => setState(
                       () => _daysBefore = (_daysBefore + 1).clamp(1, 7))),
             ]),
+            const SizedBox(height: 10),
+            _timeRow('Remind me at', _stockTime, (t) => _stockTime = t),
             const SizedBox(height: 6),
             Align(
               alignment: Alignment.centerLeft,
-              child: Text('Stock check on ${longDate(check)} · reminder at 9:00 am',
-                  style: AppText.body(12, color: AppColors.muted)),
+              child: Text(
+                  'Stock check on ${longDate(check)} · reminder at ${_t(_stockTime)}',
+                  style: AppText.body(12,
+                      color: AppColors.pinkText, weight: FontWeight.w600)),
             ),
           ],
         ]),
@@ -320,7 +328,7 @@ class _AddEventScreenState extends State<AddEventScreen> {
       const SizedBox(height: 12),
       FieldLabel('Custom order',
           child: DropdownButtonFormField<String>(
-            value: _orderId,
+            initialValue: _orderId,
             items: [
               for (final o in active)
                 DropdownMenuItem(
@@ -340,7 +348,39 @@ class _AddEventScreenState extends State<AddEventScreen> {
             onSelected: (o) => setState(() => _orderLead =
                 [0, 1, 3][['On the day', '1 day before', '3 days before'].indexOf(o)]),
           )),
+      const SizedBox(height: 4),
+      _timeRow('At what time', _orderTime, (t) => _orderTime = t),
+      if (chosen != null) ...[
+        const SizedBox(height: 6),
+        Text(
+            'You will be reminded on ${longDate(chosen.due.subtract(Duration(days: _orderLead)))} at ${_t(_orderTime)}',
+            style: AppText.body(12,
+                color: AppColors.purple, weight: FontWeight.w600)),
+      ],
     ];
+  }
+
+  /// "Remind me at  [9:00 am]" row with a time picker.
+  Widget _timeRow(String label, TimeOfDay value, ValueChanged<TimeOfDay> onPick) {
+    return Row(children: [
+      Expanded(
+          child: Text(label, style: AppText.body(14, weight: FontWeight.w600))),
+      OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.ink,
+          backgroundColor: AppColors.white,
+          side: const BorderSide(color: AppColors.line),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        icon: const Icon(Icons.schedule_rounded, size: 16),
+        label: Text(_t(value), style: AppText.body(14, weight: FontWeight.w600)),
+        onPressed: () async {
+          final t = await _time(value);
+          if (t != null) setState(() => onPick(t));
+        },
+      ),
+    ]);
   }
 
   List<Widget> _reminder() {
@@ -358,9 +398,9 @@ class _AddEventScreenState extends State<AddEventScreen> {
         })),
         const SizedBox(width: 10),
         Expanded(
-            child: _pickerBox('Time', _t(_opens), () async {
-          final t = await _time(_opens);
-          if (t != null) setState(() => _opens = t);
+            child: _pickerBox('Time', _t(_remTime), () async {
+          final t = await _time(_remTime);
+          if (t != null) setState(() => _remTime = t);
         })),
       ]),
       const SizedBox(height: 12),

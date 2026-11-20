@@ -8,8 +8,9 @@ class Routes {
   static const home = '/home'; // UI-03 + bottom tabs
   static const sell = '/sell'; // Booth sale
   static const addDesign = '/stock/add-design';
-  static const addMaterial = '/stock/add-material';
   static const bestSellers = '/best-sellers';
+  static const sales = '/sales'; // UI-07
+  static const saleDetail = '/sales/detail'; // UI-08, argument: sale id
   static const newOrder = '/orders/new';
   static const orderDetail = '/orders/detail'; // argument: order id
   static const addEvent = '/calendar/add';

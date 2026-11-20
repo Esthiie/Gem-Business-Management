@@ -11,7 +11,7 @@ import '../models/models.dart';
 class AppState extends ChangeNotifier {
   AppState() {
     designs = DemoData.designs();
-    materials = DemoData.materials();
+    sales = DemoData.sales();
     orders = DemoData.orders();
     calendar = DemoData.calendar();
     events = DemoData.pastEvents();
@@ -67,9 +67,8 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ---------------- collection & materials ----------------
+  // ---------------- collection ----------------
   late List<Design> designs;
-  late List<MaterialItem> materials;
 
   Design? designById(String id) {
     for (final d in designs) {
@@ -82,34 +81,45 @@ class AppState extends ChangeNotifier {
       designs.where((d) => d.category == category).toList();
 
   List<Design> get lowDesigns => designs.where((d) => d.isLow).toList();
-  List<MaterialItem> get lowMaterials =>
-      materials.where((m) => m.isLow).toList();
 
   void addDesign(Design d) {
     designs.add(d);
     _changed();
   }
 
-  void addMaterial(MaterialItem m) {
-    materials.add(m);
-    _changed();
-  }
-
-  void changeMaterialQty(MaterialItem m, int delta) {
-    m.qty = (m.qty + delta).clamp(0, 1 << 30);
-    _changed();
-  }
-
   // ---------------- sales & best sellers ----------------
   late List<EventInfo> events;
   late Map<String, Map<String, int>> soldByEvent;
-  final List<Sale> sales = [];
+  late List<Sale> sales;
+  int _nextSale = 100;
 
   /// Today's convention (the live booth).
   EventInfo get liveEvent => events.first;
 
-  /// Booth sale: deducts stock and adds to the event's best sellers.
-  void recordSale(String eventId, Map<String, int> cart) {
+  EventInfo eventById(String id) =>
+      events.firstWhere((e) => e.id == id, orElse: () => events.first);
+
+  Sale? saleById(String id) {
+    for (final x in sales) {
+      if (x.id == id) return x;
+    }
+    return null;
+  }
+
+  /// Sales for one event (or all when [eventId] is null), newest first.
+  List<Sale> salesFor(String? eventId, {PayMethod? method}) => sales
+      .where((x) =>
+          (eventId == null || x.eventId == eventId) &&
+          (method == null || x.method == method))
+      .toList()
+    ..sort((a, b) => b.time.compareTo(a.time));
+
+  List<Sale> get salesToday =>
+      sales.where((x) => sameDay(x.time, today)).toList();
+
+  /// Booth sale: deducts stock, adds to best sellers and saves the customer
+  /// with how they paid. Returns the new sale.
+  Sale? recordSale(String eventId, Map<String, int> cart, PayMethod method) {
     final lines = <SaleLine>[];
     final sold = soldByEvent.putIfAbsent(eventId, () => {});
     cart.forEach((id, q) {
@@ -119,19 +129,37 @@ class AppState extends ChangeNotifier {
       sold[id] = (sold[id] ?? 0) + q;
       lines.add(SaleLine(id, q, d.price));
     });
-    if (lines.isEmpty) return;
-    sales.add(Sale(eventId: eventId, time: DateTime.now(), lines: lines));
+    if (lines.isEmpty) return null;
+    final no = sales
+            .where((x) => x.eventId == eventId)
+            .fold(0, (m, x) => x.customerNo > m ? x.customerNo : m) +
+        1;
+    final now = DateTime.now();
+    final sale = Sale(
+      id: 's${_nextSale++}',
+      eventId: eventId,
+      customerNo: no,
+      time: DateTime(today.year, today.month, today.day, now.hour, now.minute),
+      lines: lines,
+      method: method,
+    );
+    sales.insert(0, sale);
     _changed();
+    return sale;
   }
 
-  /// "Enter total only" during a rush. Items are matched to stock later.
-  void recordTotalOnly(String eventId, double total, String note) {
-    sales.add(Sale(
-        eventId: eventId,
-        time: DateTime.now(),
-        lines: const [],
-        totalOnly: total,
-        note: note));
+  /// Delete a wrong sale: the pieces go back into stock and the totals
+  /// and best sellers are recalculated.
+  void deleteSale(Sale sale) {
+    final sold = soldByEvent[sale.eventId];
+    for (final l in sale.lines) {
+      final d = designById(l.designId);
+      if (d != null) d.qty += l.qty;
+      if (sold != null && sold.containsKey(l.designId)) {
+        sold[l.designId] = (sold[l.designId]! - l.qty).clamp(0, 1 << 30);
+      }
+    }
+    sales.remove(sale);
     _changed();
   }
 
@@ -148,15 +176,6 @@ class AppState extends ChangeNotifier {
   double revenueFor(String? eventId) {
     double sum = 0;
     soldFor(eventId).forEach((id, q) => sum += q * (designById(id)?.price ?? 0));
-    if (eventId == null) {
-      for (final s in sales) {
-        if (s.totalOnly != null) sum += s.totalOnly!;
-      }
-    } else {
-      for (final s in sales) {
-        if (s.eventId == eventId && s.totalOnly != null) sum += s.totalOnly!;
-      }
-    }
     return sum;
   }
 
@@ -169,6 +188,10 @@ class AppState extends ChangeNotifier {
       ..sort((a, b) => b.value.compareTo(a.value));
     return list;
   }
+
+  /// Events that have best-seller history.
+  List<EventInfo> get rankedEvents =>
+      events.where((e) => soldByEvent.containsKey(e.id)).toList();
 
   // ---------------- custom orders ----------------
   late List<CustomOrder> orders;

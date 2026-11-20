@@ -8,7 +8,7 @@ import '../theme/app_theme.dart';
 import '../widgets/bead_ring.dart';
 import '../widgets/common.dart';
 
-/// Stock: Collection (finished designs) and Materials.
+/// Stock (UI-10): Faith's collection of finished designs by category.
 class StockScreen extends StatefulWidget {
   const StockScreen({super.key});
 
@@ -17,9 +17,7 @@ class StockScreen extends StatefulWidget {
 }
 
 class _StockScreenState extends State<StockScreen> {
-  int _tab = 0; // 0 collection, 1 materials
   String _cat = 'All';
-  String _mcat = 'All';
   String _query = '';
 
   @override
@@ -29,15 +27,10 @@ class _StockScreenState extends State<StockScreen> {
 
     return Stack(children: [
       Column(children: [
-        const AppHeader(title: 'Stock', subtitle: 'Your collection and materials'),
+        const AppHeader(title: 'Stock'),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(children: [
-            Segmented(
-                options: const ['Collection', 'Materials'],
-                index: _tab,
-                onChanged: (i) => setState(() => _tab = i)),
-            const SizedBox(height: 10),
             TextField(
               onChanged: (v) => setState(() => _query = v),
               decoration: const InputDecoration(
@@ -49,7 +42,7 @@ class _StockScreenState extends State<StockScreen> {
         ),
         const SizedBox(height: 10),
         Expanded(
-          child: _tab == 0 ? _collection(s, q) : _materials(s, q),
+          child: _collection(s, q),
         ),
       ]),
       Positioned(
@@ -60,10 +53,9 @@ class _StockScreenState extends State<StockScreen> {
           backgroundColor: AppColors.ink,
           foregroundColor: AppColors.white,
           shape: const StadiumBorder(),
-          onPressed: () => Navigator.pushNamed(
-              context, _tab == 0 ? Routes.addDesign : Routes.addMaterial),
+          onPressed: () => Navigator.pushNamed(context, Routes.addDesign),
           icon: const Icon(Icons.add_rounded),
-          label: Text(_tab == 0 ? 'Add design' : 'Add material',
+          label: Text('Add design',
               style: AppText.body(15,
                   color: AppColors.white, weight: FontWeight.w700)),
         ),
@@ -103,44 +95,6 @@ class _StockScreenState extends State<StockScreen> {
       ),
       for (final d in items) _DesignRow(design: d),
     ];
-  }
-
-  Widget _materials(AppState s, String q) {
-    final lowCount = s.lowMaterials.length;
-    final items = s.materials
-        .where((m) => _mcat == 'All' || m.type == _mcat)
-        .where((m) => q.isEmpty || m.name.toLowerCase().contains(q))
-        .toList();
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 90),
-      children: [
-        ChoiceChips(
-          options: ['All', ...materialTypes],
-          selected: (c) => c == _mcat,
-          onSelected: (c) => setState(() => _mcat = c),
-        ),
-        if (lowCount > 0)
-          Container(
-            margin: const EdgeInsets.only(bottom: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-                color: AppColors.pinkSoft,
-                borderRadius: BorderRadius.circular(14)),
-            child: Row(children: [
-              const Icon(Icons.warning_amber_rounded,
-                  size: 18, color: AppColors.pinkText),
-              const SizedBox(width: 10),
-              Text('$lowCount materials below reorder level',
-                  style: AppText.body(13,
-                      color: AppColors.pinkText, weight: FontWeight.w600)),
-            ]),
-          ),
-        for (final m in items) _MaterialRow(item: m),
-        const SizedBox(height: 6),
-        Text('Materials are counted by hand. Tap − when you use some, + when you restock.',
-            style: AppText.body(11, color: AppColors.muted)),
-      ],
-    );
   }
 }
 
@@ -188,81 +142,6 @@ class _DesignRow extends StatelessWidget {
           ]),
         ),
         trailing,
-      ]),
-    );
-  }
-}
-
-class _MaterialRow extends StatelessWidget {
-  const _MaterialRow({required this.item});
-  final MaterialItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final m = item;
-    final s = context.read<AppState>();
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 11),
-      decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: AppColors.line))),
-      child: Row(children: [
-        Container(
-          width: 42,
-          height: 42,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-              color: m.colour.withAlpha(34),
-              borderRadius: BorderRadius.circular(12)),
-          child: Transform.rotate(
-            angle: 0.785,
-            child: Container(
-              width: 17,
-              height: 17,
-              decoration: BoxDecoration(
-                  color: m.colour, borderRadius: BorderRadius.circular(5)),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Flexible(
-                  child: Text(m.name,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppText.body(15, weight: FontWeight.w600))),
-              if (m.isLow) ...[
-                const SizedBox(width: 6),
-                m.qty == 0
-                    ? const Pill('Out',
-                        fg: AppColors.white, bg: AppColors.pinkText, radius: 7)
-                    : const Pill('Low',
-                        fg: AppColors.pinkText,
-                        bg: AppColors.pinkSoft,
-                        radius: 7),
-              ],
-            ]),
-            Text(m.usedIn, style: AppText.body(12, color: AppColors.muted)),
-          ]),
-        ),
-        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text('${m.qty} ${m.unit}',
-              style: AppText.body(14, weight: FontWeight.w700)),
-          const SizedBox(height: 4),
-          Row(children: [
-            RoundIconButton(
-                icon: Icons.remove_rounded,
-                size: 30,
-                tooltip: 'Use some',
-                onTap: () => s.changeMaterialQty(m, -m.step)),
-            const SizedBox(width: 6),
-            RoundIconButton(
-                icon: Icons.add_rounded,
-                size: 30,
-                tooltip: 'Add more',
-                onTap: () => s.changeMaterialQty(m, m.step)),
-          ]),
-        ]),
       ]),
     );
   }

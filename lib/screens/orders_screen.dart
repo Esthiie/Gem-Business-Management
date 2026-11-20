@@ -150,7 +150,7 @@ class _OrderCard extends StatelessWidget {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(o.customer, style: AppText.body(15, weight: FontWeight.w700)),
               Text(
-                  '${o.type} · ${o.palette}${o.lengthCm != null ? ' · ${o.lengthCm!.toStringAsFixed(0)} cm' : ''}',
+                  '${o.type} · ${o.palette}${o.type == 'Necklace' && o.lengthCm != null ? ' · ${o.lengthCm!.toStringAsFixed(0)} cm' : ''}',
                   overflow: TextOverflow.ellipsis,
                   style: AppText.body(12, color: AppColors.muted)),
             ]),
@@ -160,9 +160,17 @@ class _OrderCard extends StatelessWidget {
         const SizedBox(height: 8),
         StageBar(stage: o.stage),
         const SizedBox(height: 8),
+        // Due date, then the note, then the Overdue / Due soon flag on the right.
         Row(children: [
           Text(o.isDone ? 'Completed' : 'Due ${shortDate(o.due)}',
               style: AppText.body(12, weight: FontWeight.w600)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text('· ${OrderStage.now(o.stage)}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.body(12, color: AppColors.muted)),
+          ),
           if (overdue) ...[
             const SizedBox(width: 8),
             const Pill('Overdue',
@@ -172,12 +180,6 @@ class _OrderCard extends StatelessWidget {
             const Pill('Due soon',
                 fg: AppColors.pinkText, bg: AppColors.pinkSoft, radius: 6),
           ],
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text('· ${OrderStage.now(o.stage)}',
-                overflow: TextOverflow.ellipsis,
-                style: AppText.body(12, color: AppColors.muted)),
-          ),
         ]),
         const SizedBox(height: 8),
         if (!o.isDone)

@@ -24,9 +24,10 @@ class _AddDesignScreenState extends State<AddDesignScreen> {
   int _qty = 10;
   int _alert = 2;
   List<Color> _colours = [];
-  final Set<String> _materials = {};
   final _desc = TextEditingController();
   bool _hasDesc = false;
+
+  bool get _isNecklace => _cat == Categories.necklaces;
 
   @override
   void dispose() {
@@ -37,14 +38,28 @@ class _AddDesignScreenState extends State<AddDesignScreen> {
     super.dispose();
   }
 
-  /// Demo AI description. Step 3 calls the AI service (FR-AI) instead.
+  /// Demo AI description (FR-AI-01). Step 3 calls the AI service instead.
+  /// Faith can edit the text afterwards.
   void _writeDescription() {
     final name = _name.text.trim().isEmpty ? 'This piece' : _name.text.trim();
+    const lines = {
+      Categories.phoneCharms:
+          'a cute beaded phone charm that adds a pop of colour to your phone or bag.',
+      Categories.bracelets:
+          'a soft, stretchy beaded bracelet that stacks well with your favourites.',
+      Categories.necklaces:
+          'a one-of-a-kind beaded necklace with a little sparkle for every day.',
+      Categories.lanyards:
+          'a sturdy beaded lanyard for your keys, ID or camera.',
+      Categories.hairClips:
+          'a sweet beaded hair clip that holds well and looks lovely in photos.',
+      Categories.earrings:
+          'light beaded dangle earrings that are comfy to wear all day.',
+    };
     final len = _length.text.trim();
-    final type = _cat.toLowerCase().replaceAll('s', '');
-    _desc.text = '$name is a hand-beaded $type made in small batches by '
-        'Queens.Trinket. Soft colours, a little sparkle and made to be worn '
-        'every day.${len.isNotEmpty && len != '0' ? ' Length: $len cm.' : ''}';
+    _desc.text = '$name is ${lines[_cat]}'
+        '${_isNecklace && len.isNotEmpty && len != '0' ? ' Length: $len cm.' : ''}'
+        ' Made in small batches by Queens.Trinket.';
     setState(() => _hasDesc = true);
   }
 
@@ -63,7 +78,7 @@ class _AddDesignScreenState extends State<AddDesignScreen> {
       qty: _one ? 1 : _qty,
       colour: _colours.isNotEmpty ? _colours.first : AppColors.lavender,
       colours: _colours,
-      lengthCm: double.tryParse(_length.text),
+      lengthCm: _isNecklace ? double.tryParse(_length.text) : null,
       oneOfAKind: _one,
       lowAlert: _alert,
       description: _desc.text,
@@ -74,7 +89,6 @@ class _AddDesignScreenState extends State<AddDesignScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final s = context.watch<AppState>();
     return Scaffold(
       body: SafeArea(
         child: Column(children: [
@@ -105,6 +119,42 @@ class _AddDesignScreenState extends State<AddDesignScreen> {
                             controller: _name,
                             hint: 'e.g. Strawberry charm'),
                         const SizedBox(height: 14),
+                        FieldLabel('Description (Optional)',
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  TextField(
+                                    controller: _desc,
+                                    maxLines: 4,
+                                    minLines: 3,
+                                    style: AppText.body(14),
+                                    decoration: const InputDecoration(
+                                        hintText:
+                                            'What makes this piece special?'),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(children: [
+                                    Expanded(
+                                      child: Text(
+                                          _hasDesc
+                                              ? 'AI draft · edit it as you like'
+                                              : 'Type your own or let AI write one',
+                                          style: AppText.body(12,
+                                              color: _hasDesc
+                                                  ? AppColors.purple
+                                                  : AppColors.muted,
+                                              weight: FontWeight.w600)),
+                                    ),
+                                    SecondaryButton(
+                                        _hasDesc
+                                            ? 'Rewrite with AI'
+                                            : 'Write it with AI',
+                                        height: 40,
+                                        icon: Icons.auto_awesome_outlined,
+                                        onPressed: _writeDescription),
+                                  ]),
+                                ])),
+                        const SizedBox(height: 14),
                         Row(children: [
                           Expanded(
                               child: LabeledField(
@@ -113,14 +163,16 @@ class _AddDesignScreenState extends State<AddDesignScreen> {
                                   hint: '0.00',
                                   suffix: 'RM',
                                   number: true)),
-                          const SizedBox(width: 10),
-                          Expanded(
-                              child: LabeledField(
-                                  label: 'Length',
-                                  controller: _length,
-                                  hint: '0',
-                                  suffix: 'cm',
-                                  number: true)),
+                          if (_isNecklace) ...[
+                            const SizedBox(width: 10),
+                            Expanded(
+                                child: LabeledField(
+                                    label: 'Length (Optional)',
+                                    controller: _length,
+                                    hint: '0',
+                                    suffix: 'cm',
+                                    number: true)),
+                          ],
                         ]),
                         const SizedBox(height: 14),
                         CardBox(
@@ -183,37 +235,6 @@ class _AddDesignScreenState extends State<AddDesignScreen> {
                             ]),
                           ]),
                         ),
-                        const SizedBox(height: 14),
-                        FieldLabel('Materials used (optional)',
-                            child: ChoiceChips(
-                              options: s.materials.map((m) => m.name).toList(),
-                              scroll: false,
-                              selected: (m) => _materials.contains(m),
-                              onSelected: (m) => setState(() =>
-                                  _materials.contains(m)
-                                      ? _materials.remove(m)
-                                      : _materials.add(m)),
-                            )),
-                        const SizedBox(height: 8),
-                        FieldLabel('Description',
-                            child: _hasDesc
-                                ? Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                        Text('AI draft · edit as you like',
-                                            style: AppText.body(12,
-                                                color: AppColors.purple,
-                                                weight: FontWeight.w600)),
-                                        const SizedBox(height: 6),
-                                        TextField(
-                                            controller: _desc,
-                                            maxLines: 4,
-                                            style: AppText.body(14)),
-                                      ])
-                                : SecondaryButton('Write it with AI',
-                                    icon: Icons.auto_awesome_outlined,
-                                    onPressed: _writeDescription)),
                       ]),
                 ),
               ],

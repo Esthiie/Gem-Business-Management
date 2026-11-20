@@ -38,8 +38,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     _c['palette'] = TextEditingController(text: o.palette);
     _c['length'] = TextEditingController(
         text: o.lengthCm == null ? '' : o.lengthCm!.toStringAsFixed(0));
-    _c['deposit'] =
-        TextEditingController(text: o.deposit == 0 ? '' : o.deposit.toStringAsFixed(0));
+    _c['price'] =
+        TextEditingController(text: o.price == 0 ? '' : o.price.toStringAsFixed(0));
     _c['notes'] = TextEditingController(text: o.notes);
     setState(() => _editing = true);
   }
@@ -50,7 +50,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     o.item = _c['item']!.text.trim();
     o.palette = _c['palette']!.text.trim();
     o.lengthCm = double.tryParse(_c['length']!.text);
-    o.deposit = double.tryParse(_c['deposit']!.text) ?? 0;
+    o.price = double.tryParse(_c['price']!.text) ?? o.price;
     o.notes = _c['notes']!.text.trim();
     s.updateOrder(o);
     setState(() => _editing = false);
@@ -79,18 +79,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           o.lengthCm == null ? 'Not set' : '${o.lengthCm!.toStringAsFixed(0)} cm',
           o.lengthCm != null),
       _Check('Deadline', longDate(o.due), true),
-      _Check('Reference picture',
-          o.pictures > 0 ? '${o.pictures} photo' : 'Not added', o.pictures > 0),
-      _Check(
-          'Deposit',
-          o.deposit <= 0
-              ? 'Not received'
-              : o.deposit >= o.price
-                  ? 'Paid in full · ${rm(o.price)}'
-                  : '${rm(o.deposit)} of ${rm(o.price)}',
-          o.deposit > 0),
+      _Check('Reference picture (optional)',
+          o.pictures > 0 ? '${o.pictures} photo' : 'None', o.pictures > 0,
+          optional: true),
     ];
-    final filled = checks.where((c) => c.ok).length;
+    final needed = checks.where((c) => !c.optional).toList();
+    final filled = needed.where((c) => c.ok).length;
 
     return Scaffold(
       body: SafeArea(
@@ -182,7 +176,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                   ),
                                 ]),
                                 Text(
-                                    '$filled of ${checks.length} filled in · ticks itself as you fill them in',
+                                    '$filled of ${needed.length} filled in · ticks itself as you fill them in',
                                     style: AppText.body(12,
                                         color: AppColors.muted)),
                                 const SizedBox(height: 6),
@@ -277,12 +271,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   weight: FontWeight.w700)),
         ),
         const SizedBox(width: 10),
-        Expanded(child: Text(c.label, style: AppText.body(14))),
+        Expanded(
+            child: Text(c.label,
+                style: AppText.body(14,
+                    color: c.optional && !c.ok
+                        ? AppColors.muted
+                        : AppColors.ink))),
         Flexible(
           child: Text(c.value,
               textAlign: TextAlign.right,
               style: AppText.body(13,
-                  color: c.ok ? AppColors.ink : AppColors.pinkText,
+                  color: c.ok
+                      ? AppColors.ink
+                      : (c.optional ? AppColors.muted : AppColors.pinkText),
                   weight: FontWeight.w600)),
         ),
       ]),
@@ -314,8 +315,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           const SizedBox(width: 10),
           Expanded(
               child: LabeledField(
-                  label: 'Deposit (RM)',
-                  controller: _c['deposit'],
+                  label: 'Price (RM)',
+                  controller: _c['price'],
                   hint: '0',
                   number: true)),
         ]),
@@ -327,10 +328,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 }
 
 class _Check {
-  const _Check(this.label, this.value, this.ok);
+  const _Check(this.label, this.value, this.ok, {this.optional = false});
   final String label;
   final String value;
   final bool ok;
+  final bool optional;
 }
 
 /// Four dots joined by a line, coloured by status.
